@@ -3,11 +3,20 @@ import { ArticleInput } from "./components/ArticleInput";
 import { ArticleOverview } from "./components/ArticleOverview";
 import { ErrorNotice } from "./components/ErrorNotice";
 import { GeneratingView } from "./components/GeneratingView";
+import { QuizPlayer } from "./components/QuizPlayer";
 import { QuizReady } from "./components/QuizReady";
 import { QuizSetup } from "./components/QuizSetup";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { AppError } from "./lib/errors";
 import type { GenerationProgress } from "./lib/quiz/generate";
+import {
+  clearActiveSession,
+  loadActiveSession,
+  newSession,
+  saveActiveSession,
+  scoreOf,
+  type QuizSession,
+} from "./lib/quiz/session";
 import type { Quiz, QuizConfig } from "./lib/quiz/types";
 import { loadCachedCategories, saveCachedCategories } from "./lib/storage/categories";
 import {
@@ -28,7 +37,9 @@ type View =
   | { name: "loading-article"; ref: ArticleRef }
   | { name: "article"; article: Article; error?: unknown; lastConfig?: QuizConfig }
   | { name: "generating"; article: Article; config: QuizConfig; progress: GenerationProgress }
-  | { name: "ready"; article: Article; quiz: Quiz };
+  | { name: "ready"; article: Article; quiz: Quiz }
+  | { name: "playing"; article: Article | null; session: QuizSession }
+  | { name: "results"; article: Article | null; session: QuizSession };
 
 export default function App() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
@@ -36,6 +47,7 @@ export default function App() {
   const [quizPrefs, setQuizPrefs] = useState<QuizConfig>(loadQuizPrefs);
   const [view, setView] = useState<View>({ name: "home" });
   const [settingsOpen, setSettingsOpen] = useState<{ reason?: string } | null>(null);
+  const [resumable, setResumable] = useState<QuizSession | null>(loadActiveSession);
   const abortRef = useRef<AbortController | null>(null);
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
@@ -102,6 +114,17 @@ export default function App() {
     setView(next);
   };
 
+  const play = (article: Article | null, session: QuizSession) => {
+    saveActiveSession(session);
+    setResumable(null);
+    setView({ name: "playing", article, session });
+  };
+
+  const quitQuiz = (article: Article | null) => {
+    clearActiveSession();
+    setView(article ? { name: "article", article } : { name: "home" });
+  };
+
   const keyMissing = !apiKey;
 
   return (
@@ -135,6 +158,29 @@ export default function App() {
             <p className="lede">
               Turn any Wikipedia article into a quiz, then find out which parts of the topic you're weakest in.
             </p>
+            {resumable && (
+              <div className="notice notice-info resume">
+                <p>
+                  You have an unfinished quiz on <strong>{resumable.quiz.article.displayTitle}</strong> (question{" "}
+                  {resumable.answers.length + 1} of {resumable.quiz.questions.length}).
+                </p>
+                <div className="notice-actions">
+                  <button type="button" className="btn btn-primary" onClick={() => play(null, resumable)}>
+                    Resume quiz
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      clearActiveSession();
+                      setResumable(null);
+                    }}
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
             <ArticleInput
               defaultLang={settings.defaultLang}
               busy={false}
@@ -196,11 +242,37 @@ export default function App() {
         {view.name === "ready" && (
           <QuizReady
             quiz={view.quiz}
-            onStart={() => {
-              /* gameplay arrives in stage 3 */
-            }}
+            onStart={() => play(view.article, newSession(view.quiz))}
             onBack={() => setView({ name: "article", article: view.article, lastConfig: view.quiz.config })}
           />
+        )}
+        {view.name === "playing" && (
+          <QuizPlayer
+            key={view.session.id}
+            session={view.session}
+            onChange={(session) => {
+              saveActiveSession(session);
+              setView({ ...view, session });
+            }}
+            onFinish={(session) => {
+              clearActiveSession();
+              setView({ name: "results", article: view.article, session });
+            }}
+            onQuit={() => quitQuiz(view.article)}
+          />
+        )}
+
+        {view.name === "results" && (
+          <section className="card">
+            <p className="eyebrow">Results</p>
+            <h2 className="article-title">{view.session.quiz.article.displayTitle}</h2>
+            <p className="big-score">
+              {scoreOf(view.session).correct} / {scoreOf(view.session).total}
+            </p>
+            <button type="button" className="btn btn-primary" onClick={() => quitQuiz(view.article)}>
+              Done
+            </button>
+          </section>
         )}
       </main>
 

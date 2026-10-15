@@ -285,7 +285,7 @@ function textOf(el: Element): string {
 
 function cleanText(s: string): string {
   return s
-    .replace(/ /g, " ")
+    .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\s+([,.])(?=\s|$)/g, "$1")
     .replace(/\(\s*[;,]?\s*\)/g, "") // "( )" left behind after removing pronunciations/refs
