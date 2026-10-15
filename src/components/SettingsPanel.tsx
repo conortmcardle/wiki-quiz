@@ -16,15 +16,28 @@ interface Props {
   settings: Settings;
   onSaveKey: (key: string) => void;
   onClearKey: () => void;
+  onClearHistory: () => void;
   onChange: (patch: Partial<Settings>) => void;
   onClose: () => void;
 }
 
-export function SettingsPanel({ open, reason, apiKey, settings, onSaveKey, onClearKey, onChange, onClose }: Props) {
+export function SettingsPanel({
+  open,
+  reason,
+  apiKey,
+  settings,
+  onSaveKey,
+  onClearKey,
+  onClearHistory,
+  onChange,
+  onClose,
+}: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [draftKey, setDraftKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [cleared, setCleared] = useState(false);
   const [customModel, setCustomModel] = useState(
     MODEL_PRESETS.some((m) => m.id === settings.model) ? "" : settings.model,
   );
@@ -37,6 +50,8 @@ export function SettingsPanel({ open, reason, apiKey, settings, onSaveKey, onCle
       setDraftKey("");
       setKeyError(null);
       setShowKey(false);
+      setConfirmClear(false);
+      setCleared(false);
       dialog.showModal();
     } else if (!open && dialog.open) {
       dialog.close();
@@ -207,6 +222,41 @@ export function SettingsPanel({ open, reason, apiKey, settings, onSaveKey, onCle
               recommended fallback model instead of failing.
             </span>
           </label>
+        </section>
+
+        <section className="settings-section">
+          <h3>Saved quiz history</h3>
+          <p className="muted small">
+            Your scores, topic categories and any unfinished quiz are saved in this browser so you can track
+            progress. Your API key and settings are kept.
+          </p>
+          {cleared ? (
+            <p className="small" role="status">
+              Quiz history deleted.
+            </p>
+          ) : confirmClear ? (
+            <p className="small">
+              Delete all saved scores and categories?{" "}
+              <button
+                type="button"
+                className="btn btn-danger btn-small"
+                onClick={() => {
+                  onClearHistory();
+                  setCleared(true);
+                  setConfirmClear(false);
+                }}
+              >
+                Delete
+              </button>{" "}
+              <button type="button" className="btn btn-ghost btn-small" onClick={() => setConfirmClear(false)}>
+                Cancel
+              </button>
+            </p>
+          ) : (
+            <button type="button" className="btn btn-ghost btn-small" onClick={() => setConfirmClear(true)}>
+              Delete quiz history
+            </button>
+          )}
         </section>
       </div>
     </dialog>

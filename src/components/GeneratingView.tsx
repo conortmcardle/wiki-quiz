@@ -4,18 +4,22 @@ interface Props {
   title: string;
   progress: GenerationProgress;
   model: string;
+  /** Practice quiz weighted toward weak areas. */
+  focus?: boolean;
   onCancel: () => void;
 }
 
 const STEPS: GenerationProgress["phase"][] = ["categories", "questions", "checking"];
 const STEP_LABELS = { categories: "Choose topic categories", questions: "Write questions", checking: "Check against the article" };
 
-export function GeneratingView({ title, progress, model, onCancel }: Props) {
+export function GeneratingView({ title, progress, model, focus, onCancel }: Props) {
   const current = STEPS.indexOf(progress.phase);
   return (
     <div className="card loading-card generating" aria-live="polite" aria-busy="true">
       <div className="spinner" aria-hidden="true" />
-      <h2 className="generating-title">Building your quiz on {title}</h2>
+      <h2 className="generating-title">
+        {focus ? "Building a practice quiz on your weak areas" : "Building your quiz"} on {title}
+      </h2>
       <ol className="steps">
         {STEPS.map((step, i) => (
           <li key={step} className={i < current ? "done" : i === current ? "active" : ""}>
